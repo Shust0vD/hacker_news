@@ -1,20 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import GetListNews from 'API/GetListNews';
 import { FeedItemSchema } from 'schemes/FeedItemSchema';
 import { Main, Card, CardBody, NewsNumber, NewsInfo, NewsBlock, UpdateNewsButton } from './HomePageStyles';
 import Loader from 'components/Loader/Loader';
+import moment from 'moment';
 
 export default function HomePage() {
   const [news, setNews] = useState<FeedItemSchema[]>([]);
   const [updater, setUpdater] = useState(false);
   const [loader, setLoader] = useState(true);
+  const [page, setPage] = useState(1);
 
-  const GetResponse = async () => {
-    const response = await GetListNews();
-    setNews(response.map((promise) => promise.data).flat());
+  const GetResponse = useCallback(async () => {
+    const response = await GetListNews(page);
+    if (response.data.length == 0) {
+      setPage(page - 1);
+      return;
+    }
+    setNews(response.data);
     setLoader(false);
-  };
+  }, [page]);
 
   useEffect(() => {
     GetResponse();
@@ -22,7 +28,7 @@ export default function HomePage() {
       GetResponse();
     }, 60000);
     return () => clearInterval(timer);
-  }, [updater]);
+  }, [updater, GetResponse]);
 
   return (
     <Main>
@@ -41,17 +47,35 @@ export default function HomePage() {
           return (
             <Card key={index} bgColor={index % 2 == 0 ? 'Khaki' : 'PaleGoldenrod'}>
               <CardBody>
-                <NewsNumber>{index + 1}. </NewsNumber>
+                <NewsNumber>{index + 1 + (page - 1) * 10}. </NewsNumber>
                 <NewsBlock>
                   <Link to={`/${item.id}`}>{item.title}</Link>
                   <NewsInfo>
-                    {item?.points} points | by {item?.user} | {new Date(item.time * 1000).toLocaleString('ru')}
+                    {item?.points} points | by {item?.user} | {moment(new Date(item.time)).fromNow()}
                   </NewsInfo>
                 </NewsBlock>
               </CardBody>
             </Card>
           );
         })}
+      <UpdateNewsButton
+        onClick={() => {
+          setUpdater(!updater);
+          setLoader(true);
+          page > 1 && setPage(page - 1);
+        }}
+      >
+        Previous Page
+      </UpdateNewsButton>
+      <UpdateNewsButton
+        onClick={() => {
+          setUpdater(!updater);
+          setLoader(true);
+          setPage(page + 1);
+        }}
+      >
+        Next Page
+      </UpdateNewsButton>
     </Main>
   );
 }
